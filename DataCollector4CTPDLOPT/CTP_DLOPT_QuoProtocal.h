@@ -7,11 +7,12 @@ typedef struct
 {
 	char						Key[20];					///< 索引键值
 	unsigned int				MarketID;					///< 市场编号
+	unsigned int				MarketDate;					///< 市场日期
 	unsigned int				KindCount;					///< 类别数量
 	unsigned int				WareCount;					///< 商品数量
 	unsigned int				PeriodsCount;				///< 交易时段信息列表长度
 	unsigned int				MarketPeriods[10][2];		///< 交易时段描述信息列表
-} tagDLFutureMarketInfo_LF100;
+} tagDLOptionMarketInfo_LF128;
 
 
 typedef struct
@@ -21,16 +22,15 @@ typedef struct
 	unsigned int				PriceRate;					///< 价格放大倍数[10的多少次方]
 	unsigned int				LotFactor;					///< “手”比率
 	unsigned int				WareCount;					///< 该分类的商品数量
-} tagDLFutureKindDetail_LF101;
+} tagDLOptionKindDetail_LF129;
 
 
 typedef struct
 {
 	char						Key[20];					///< 索引键值
-	unsigned int				MarketDate;					///< 市场日期
 	unsigned int				MarketTime;					///< 市场时间
 	unsigned char				MarketStatus;				///< 市场状态[0初始化 1行情中]
-} tagDLFutureMarketStatus_HF102;
+} tagDLOptionMarketStatus_HF130;
 
 
 typedef struct
@@ -48,10 +48,8 @@ typedef struct
 	unsigned int				XqDate;						///< 行权日(YYYYMM)
 	unsigned int				DeliveryDate;				///< 交割日(YYYYMMDD)
 	unsigned int				ExpireDate;					///< 到期日(YYYYMMDD)
-	unsigned short				TypePeriodIdx;				///< 分类交易时间段位置
-	unsigned char				EarlyNightFlag;             ///< 日盘or夜盘标志 1：日盘 2：夜盘 
 	unsigned int				PriceTick;					///< 最小变动价位
-} tagDLFutureReferenceData_LF103;
+} tagDLOptionReferenceData_LF131;
 
 
 typedef struct
@@ -65,7 +63,7 @@ typedef struct
 	unsigned int				SettlePrice;				///< 今结价[*放大倍数]
 	unsigned int				PreSettlePrice;				///< 合约昨结[*放大倍数]
 	unsigned __int64			PreOpenInterest;			///< 昨日持仓量(张)
-} tagDLFutureSnapData_LF104;
+} tagDLOptionSnapData_LF132;
 
 
 typedef struct
@@ -77,22 +75,22 @@ typedef struct
 	double						Amount;						///< 总成交金额[元]
 	unsigned __int64			Volume;						///< 总成交量[股/张]
 	unsigned __int64			Position;					///< 持仓量
-} tagDLFutureSnapData_HF105;
+} tagDLOptionSnapData_HF133;
 
 
 typedef struct
 {
 	unsigned int				Price;						///< 委托价格[* 放大倍数]
 	unsigned __int64			Volume;						///< 委托量[股]
-} tagDLFutureBuySellItem;
+} tagDLOptionBuySellItem;
 
 
 typedef struct
 {
 	char						Code[20];					///< 合约代码
-	tagDLFutureBuySellItem		Buy[5];						///< 买五档
-	tagDLFutureBuySellItem		Sell[5];					///< 卖五档
-} tagDLFutureSnapBuySell_HF106;
+	tagDLOptionBuySellItem		Buy[5];						///< 买五档
+	tagDLOptionBuySellItem		Sell[5];					///< 卖五档
+} tagDLOptionSnapBuySell_HF134;
 
 
 
