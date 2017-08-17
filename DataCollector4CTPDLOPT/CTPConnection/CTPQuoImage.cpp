@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string>
 #include <algorithm>
 #include "CTPQuoImage.h"
@@ -24,7 +25,7 @@ int CTPQuoImage::GetRate( unsigned int nKind )
 {
 	if( m_mapRate.find( nKind ) == m_mapRate.end() )
 	{
-		return m_mapRate[nKind];
+		return ::pow( (double)10, (int)m_mapRate[nKind] );
 	}
 
 	return -1;
@@ -92,12 +93,13 @@ int CTPQuoImage::FreshCache()
 
 void CTPQuoImage::BuildBasicData()
 {
-	tagDLFutureMarketInfo_LF100		tagMkInfo = { 0 };
-	tagDLFutureMarketStatus_HF102	tagStatus = { 0 };
+	tagDLOptionMarketInfo_LF128		tagMkInfo = { 0 };
+	tagDLOptionMarketStatus_HF130	tagStatus = { 0 };
 
 	::strcpy( tagMkInfo.Key, "mkinfo" );
 	tagMkInfo.WareCount = m_mapBasicData.size();
 	tagMkInfo.MarketID = Configuration::GetConfig().GetMarketID();
+	tagMkInfo.MarketDate = DateTime::Now().DateToLong();
 
 	tagMkInfo.PeriodsCount = 4;					///< 交易时段信息设置
 	tagMkInfo.MarketPeriods[0][0] = 21*60;		///< 第一段，取夜盘的时段的最大范围
@@ -112,49 +114,39 @@ void CTPQuoImage::BuildBasicData()
 	///< 配置分类信息
 	tagMkInfo.KindCount = 4;
 	{
-		tagDLFutureKindDetail_LF101		tagKind = { 0 };
+		tagDLOptionKindDetail_LF129		tagKind = { 0 };
 
 		::strncpy( tagKind.KindName, "指数保留", 8 );
 		tagKind.PriceRate = 0;
 		tagKind.LotFactor = 0;
 		m_mapRate[m_mapRate.size()] = tagKind.PriceRate;
-		QuoCollector::GetCollector()->OnImage( 101, (char*)&tagKind, sizeof(tagKind), true );
+		QuoCollector::GetCollector()->OnImage( 129, (char*)&tagKind, sizeof(tagKind), true );
 	}
 	{
-		tagDLFutureKindDetail_LF101		tagKind = { 0 };
+		tagDLOptionKindDetail_LF129		tagKind = { 0 };
 
 		::strncpy( tagKind.KindName, "大连期指", 8 );
 		tagKind.PriceRate = 2;
 		tagKind.LotFactor = 100;
 		m_mapRate[m_mapRate.size()] = tagKind.PriceRate;
-		QuoCollector::GetCollector()->OnImage( 101, (char*)&tagKind, sizeof(tagKind), true );
+		QuoCollector::GetCollector()->OnImage( 129, (char*)&tagKind, sizeof(tagKind), true );
 	}
 	{
-		tagDLFutureKindDetail_LF101		tagKind = { 0 };
-
-		::strncpy( tagKind.KindName, "大连合约", 8 );
-		tagKind.PriceRate = 2;
-		tagKind.LotFactor = 100;
-		m_mapRate[m_mapRate.size()] = tagKind.PriceRate;
-		QuoCollector::GetCollector()->OnImage( 101, (char*)&tagKind, sizeof(tagKind), true );
-	}
-	{
-		tagDLFutureKindDetail_LF101		tagKind = { 0 };
+		tagDLOptionKindDetail_LF129		tagKind = { 0 };
 
 		::strncpy( tagKind.KindName, "大连期权", 8 );
 		tagKind.PriceRate = 2;
 		tagKind.LotFactor = 100;
 		m_mapRate[m_mapRate.size()] = tagKind.PriceRate;
-		QuoCollector::GetCollector()->OnImage( 101, (char*)&tagKind, sizeof(tagKind), true );
+		QuoCollector::GetCollector()->OnImage( 129, (char*)&tagKind, sizeof(tagKind), true );
 	}
 
 	::strcpy( tagStatus.Key, "mkstatus" );
 	tagStatus.MarketStatus = 0;
-	tagStatus.MarketDate = DateTime::Now().DateToLong();
 	tagStatus.MarketTime = DateTime::Now().TimeToLong();
 
-	QuoCollector::GetCollector()->OnImage( 100, (char*)&tagMkInfo, sizeof(tagMkInfo), true );
-	QuoCollector::GetCollector()->OnImage( 102, (char*)&tagStatus, sizeof(tagStatus), true );
+	QuoCollector::GetCollector()->OnImage( 128, (char*)&tagMkInfo, sizeof(tagMkInfo), true );
+	QuoCollector::GetCollector()->OnImage( 130, (char*)&tagStatus, sizeof(tagStatus), true );
 }
 
 int CTPQuoImage::FreeApi()
@@ -355,27 +347,22 @@ void CTPQuoImage::OnRspQryInstrument( CThostFtdcInstrumentField *pInstrument, CT
 	{
 		QuotationSync::CTPSyncSaver::GetHandle().SaveStaticData( *pInstrument );
 
-		if( false == m_bIsResponded )
+		if( false == m_bIsResponded && pInstrument->ProductClass == THOST_FTDC_PC_Options )
 		{	///< 判断为是否需要过滤的商品
 			CThostFtdcInstrumentField&		refSnap = *pInstrument;						///< 交易请求接口返回结构
 			CriticalLock					section( m_oLock );
-			tagDLFutureReferenceData_LF103	tagName = { 0 };							///< 商品基础信息结构
-			tagDLFutureSnapData_HF105		tagSnapHF = { 0 };							///< 高速行情快照
-			tagDLFutureSnapData_LF104		tagSnapLF = { 0 };							///< 低速行情快照
-			tagDLFutureSnapBuySell_HF106	tagSnapBS = { 0 };							///< 档位信息
+			tagDLOptionReferenceData_LF131	tagName = { 0 };							///< 商品基础信息结构
+			tagDLOptionSnapData_HF133		tagSnapHF = { 0 };							///< 高速行情快照
+			tagDLOptionSnapData_LF132		tagSnapLF = { 0 };							///< 低速行情快照
+			tagDLOptionSnapBuySell_HF134	tagSnapBS = { 0 };							///< 档位信息
 
-			m_mapBasicData[std::string(pInstrument->InstrumentID)] = *pInstrument;
 			::strncpy( tagName.Code, refSnap.InstrumentID, sizeof(tagName.Code) );		///< 商品代码
 			::memcpy( tagSnapHF.Code, refSnap.InstrumentID, sizeof(tagSnapHF.Code) );	///< 商品代码
 			::memcpy( tagSnapLF.Code, refSnap.InstrumentID, sizeof(tagSnapLF.Code) );	///< 商品代码
 			::memcpy( tagSnapBS.Code, refSnap.InstrumentID, sizeof(tagSnapBS.Code) );	///< 商品代码
 			::strncpy( tagName.Name, refSnap.InstrumentName, sizeof(tagName.Code) );	///< 商品名称
 
-			tagName.Kind = JudgeKindFromSecurityID( tagName.Code );						///< 期权的分类
-			if( tagName.Kind < 0 ) {
-				return;																	///< 需要过滤的情况
-			}
-
+			tagName.Kind = 2;
 			if( THOST_FTDC_CP_CallOptions == refSnap.OptionsType )
 			{
 				tagName.DerivativeType = 0;
@@ -402,21 +389,13 @@ void CTPQuoImage::OnRspQryInstrument( CThostFtdcInstrumentField *pInstrument, CT
 				tagName.LotSize = 1;													///< 手比率
 			}
 
-//			tagName.TypePeriodIdx = refMkRules[refMkID.ParsePreNameFromCode(tagName.Code)].nPeriodIdx;	///< 分类交易时间段位置
-/*			const DataRules::tagPeriods& oPeriod = refMkRules[tagName.TypePeriodIdx];
-			int	stime = ((oPeriod.nPeriod[0][0]/60)*100 + oPeriod.nPeriod[0][0]%60)*100;				///< 合约的交易时段的起始点
-			if( stime == EARLY_OPEN_TIME ) {
-				tagName.EarlyNightFlag = 1;
-			} else {
-				tagName.EarlyNightFlag = 2;
-			}*/
-
 			tagName.PriceTick = refSnap.PriceTick*m_mapRate[tagName.Kind]+0.5;							///< 行权价格(精确到厘) //[*放大倍数] 
 
-			QuoCollector::GetCollector()->OnImage( 103, (char*)&tagName, sizeof(tagName), bIsLast );
-			QuoCollector::GetCollector()->OnImage( 104, (char*)&tagSnapLF, sizeof(tagSnapLF), bIsLast );
-			QuoCollector::GetCollector()->OnImage( 105, (char*)&tagSnapHF, sizeof(tagSnapHF), bIsLast );
-			QuoCollector::GetCollector()->OnImage( 106, (char*)&tagSnapBS, sizeof(tagSnapBS), bIsLast );
+			m_mapBasicData[std::string(pInstrument->InstrumentID)] = *pInstrument;
+			QuoCollector::GetCollector()->OnImage( 131, (char*)&tagName, sizeof(tagName), bIsLast );
+			QuoCollector::GetCollector()->OnImage( 132, (char*)&tagSnapLF, sizeof(tagSnapLF), bIsLast );
+			QuoCollector::GetCollector()->OnImage( 133, (char*)&tagSnapHF, sizeof(tagSnapHF), bIsLast );
+			QuoCollector::GetCollector()->OnImage( 134, (char*)&tagSnapBS, sizeof(tagSnapBS), bIsLast );
 		}
 	}
 
