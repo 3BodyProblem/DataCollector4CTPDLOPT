@@ -148,49 +148,11 @@ void CTPQuoImage::BuildBasicData()
 	tagDLOptionMarketInfo_LF128		tagMkInfo = { 0 };
 	tagDLOptionMarketStatus_HF130	tagStatus = { 0 };
 
-	::strcpy( tagMkInfo.Key, "mkinfo" );
 	tagMkInfo.WareCount = m_mapBasicData.size();
 	tagMkInfo.MarketID = Configuration::GetConfig().GetMarketID();
 	tagMkInfo.MarketDate = DateTime::Now().DateToLong();
-
-	///< 配置分类信息
-	for( T_MAP_BASEDATA::iterator it = m_mapBasicData.begin(); it != m_mapBasicData.end(); it++ )
-	{
-		CThostFtdcInstrumentField&			refData = it->second;
-		std::string							sCodeKey( refData.UnderlyingInstrID );
-
-		if( m_mapKind.find( sCodeKey ) == m_mapKind.end() )
-		{
-			tagDLOptionKindDetail_LF129&	refKind = m_mapKind[sCodeKey];
-
-			::memset( &refKind, 0, sizeof(refKind) );
-			::sprintf( refKind.Key, "%u", m_mapKind.size()-1 );
-			::strcpy( refKind.KindName, refData.UnderlyingInstrID );
-			::strcpy( refKind.UnderlyingCode, refData.UnderlyingInstrID );
-			refKind.PriceRate = 2;
-			refKind.LotSize = 1;
-			refKind.LotFactor = 100;
-			refKind.PriceTick = refData.PriceTick * ::pow( (double)10, (int)refKind.PriceRate );
-			refKind.ContractMult = refData.VolumeMultiple;
-			refKind.OptionType = 'A';
-			refKind.PeriodsCount = 4;
-			refKind.MarketPeriods[0][0] = 21*60;			///< 第一段，取夜盘的时段的最大范围
-			refKind.MarketPeriods[0][1] = 23*60+30;
-			refKind.MarketPeriods[1][0] = 9*60;				///< 第二段
-			refKind.MarketPeriods[1][1] = 10*60+15;
-			refKind.MarketPeriods[2][0] = 10*60+30;			///< 第三段
-			refKind.MarketPeriods[2][1] = 11*60+30;
-			refKind.MarketPeriods[3][0] = 13*60+30;			///< 第四段
-			refKind.MarketPeriods[3][1] = 15*60;
-
-			m_mapRate[::atoi(refKind.Key)] = refKind.PriceRate;
-			QuoCollector::GetCollector()->OnImage( 129, (char*)&refKind, sizeof(tagDLOptionKindDetail_LF129), true );
-		}
-	}
-
 	tagMkInfo.KindCount = m_mapKind.size();
 
-	::strcpy( tagStatus.Key, "mkstatus" );
 	tagStatus.MarketStatus = 0;
 	tagStatus.MarketTime = DateTime::Now().TimeToLong();
 
@@ -416,24 +378,51 @@ void CTPQuoImage::OnRspQryInstrument( CThostFtdcInstrumentField *pInstrument, CT
 			T_MAP_KIND::iterator it = m_mapKind.find( refSnap.UnderlyingInstrID );
 			if( it != m_mapKind.end() )
 			{
-				tagName.CallOrPut = (THOST_FTDC_CP_CallOptions==refSnap.OptionsType) ? 'C' : 'P';
-				tagName.DeliveryDate = ::atol(refSnap.StartDelivDate);						///< 交割日(YYYYMMDD)
-				tagName.StartDate = ::atol(refSnap.OpenDate);								///< 首个交易日(YYYYMMDD)
-				tagName.EndDate = ::atol(refSnap.ExpireDate);								///< 最后交易日(YYYYMMDD), 即 到期日
-				tagName.ExpireDate = tagName.EndDate;										///< 到期日(YYYYMMDD)
-				tagName.XqDate = ParseExerciseDateFromCode( tagName.Code );				///< 行权日(YYYYMM), 解析自code
-				tagName.XqPrice = refSnap.StrikePrice*GetRate(tagName.Kind)+0.5;		///< 行权价格(精确到厘) //[*放大倍数] 
-
-				m_mapBasicData[std::string(pInstrument->InstrumentID)] = *pInstrument;
-				QuoCollector::GetCollector()->OnImage( 131, (char*)&tagName, sizeof(tagName), bIsLast );
-				QuoCollector::GetCollector()->OnImage( 132, (char*)&tagSnapLF, sizeof(tagSnapLF), bIsLast );
-				QuoCollector::GetCollector()->OnImage( 133, (char*)&tagSnapHF, sizeof(tagSnapHF), bIsLast );
-				QuoCollector::GetCollector()->OnImage( 134, (char*)&tagSnapBS, sizeof(tagSnapBS), bIsLast );
+				tagName.Kind = ::atoi( it->second.Key );
 			}
 			else
 			{
-				QuoCollector::GetCollector()->OnLog( TLV_WARN, "CTPQuoImage::OnRspQryInstrument() : ignore invalid kind index, code=%s, underlyingcode=%s", refSnap.InstrumentID, refSnap.UnderlyingInstrID );
+				std::string							sCodeKey( refSnap.UnderlyingInstrID );
+				tagDLOptionKindDetail_LF129&		refKind = m_mapKind[sCodeKey];
+
+				::memset( &refKind, 0, sizeof(refKind) );
+				::sprintf( refKind.Key, "%u", m_mapKind.size()-1 );
+				::strcpy( refKind.KindName, refSnap.UnderlyingInstrID );
+				::strcpy( refKind.UnderlyingCode, refSnap.UnderlyingInstrID );
+				refKind.PriceRate = 2;
+				refKind.LotSize = 1;
+				refKind.LotFactor = 100;
+				refKind.PriceTick = refSnap.PriceTick * ::pow( (double)10, (int)refKind.PriceRate );
+				refKind.ContractMult = refSnap.VolumeMultiple;
+				refKind.OptionType = 'A';
+				refKind.PeriodsCount = 4;
+				refKind.MarketPeriods[0][0] = 21*60;			///< 第一段，取夜盘的时段的最大范围
+				refKind.MarketPeriods[0][1] = 23*60+30;
+				refKind.MarketPeriods[1][0] = 9*60;				///< 第二段
+				refKind.MarketPeriods[1][1] = 10*60+15;
+				refKind.MarketPeriods[2][0] = 10*60+30;			///< 第三段
+				refKind.MarketPeriods[2][1] = 11*60+30;
+				refKind.MarketPeriods[3][0] = 13*60+30;			///< 第四段
+				refKind.MarketPeriods[3][1] = 15*60;
+
+				m_mapRate[::atoi(refKind.Key)] = refKind.PriceRate;
+				tagName.Kind = ::atoi( refKind.Key );
+				QuoCollector::GetCollector()->OnImage( 129, (char*)&refKind, sizeof(tagDLOptionKindDetail_LF129), true );
 			}
+
+			tagName.CallOrPut = (THOST_FTDC_CP_CallOptions==refSnap.OptionsType) ? 'C' : 'P';
+			tagName.DeliveryDate = ::atol(refSnap.StartDelivDate);						///< 交割日(YYYYMMDD)
+			tagName.StartDate = ::atol(refSnap.OpenDate);								///< 首个交易日(YYYYMMDD)
+			tagName.EndDate = ::atol(refSnap.ExpireDate);								///< 最后交易日(YYYYMMDD), 即 到期日
+			tagName.ExpireDate = tagName.EndDate;										///< 到期日(YYYYMMDD)
+			tagName.XqDate = ParseExerciseDateFromCode( tagName.Code );				///< 行权日(YYYYMM), 解析自code
+			tagName.XqPrice = refSnap.StrikePrice*GetRate(tagName.Kind)+0.5;		///< 行权价格(精确到厘) //[*放大倍数] 
+
+			m_mapBasicData[std::string(pInstrument->InstrumentID)] = *pInstrument;
+			QuoCollector::GetCollector()->OnImage( 131, (char*)&tagName, sizeof(tagName), bIsLast );
+			QuoCollector::GetCollector()->OnImage( 132, (char*)&tagSnapLF, sizeof(tagSnapLF), bIsLast );
+			QuoCollector::GetCollector()->OnImage( 133, (char*)&tagSnapHF, sizeof(tagSnapHF), bIsLast );
+			QuoCollector::GetCollector()->OnImage( 134, (char*)&tagSnapBS, sizeof(tagSnapBS), bIsLast );
 		}
 	}
 
